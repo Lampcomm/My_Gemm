@@ -3,6 +3,6 @@
 
 void generate_random_matrix(int size, double* a);
 void print_matrix(int n, int m, int ld, double* a);
-void check(int n, int m, double* c_ref, int ldCRef, double* c, int ldC);
+double max_diff(int n, int m, double* c_ref, double* c);
 
 #endif
