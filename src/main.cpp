@@ -6,16 +6,18 @@
 #include "../include/stuff_for_matrix .h"
 #include "../include/gemm.h"
 
-constexpr int begin_size = 50,
+constexpr int begin_size = 100,
               end_size = 10000,
-              step = 5,
+              step = 100,
               number_of_tests = 10;
 
 int main() {
     double one = 1.0;
     double maxDiff = 0.0;
 
-    freopen("output.txt", "w", stdout);
+    std::ofstream out_blis("blis.csv"), out_jpi_ji_packed("jpi_ji_packed.csv");
+    out_blis << "N,GFLOPS\n";
+    out_jpi_ji_packed << "N,GFLOPS\n";
 
     for (int size = begin_size; size <= end_size; size += step) {
         auto a = new double[size * size];
@@ -51,6 +53,8 @@ int main() {
 
         std::cout << "BLIS Size:                  " << size << "x" << size << "\tTime: " << best_time.count() * 1e-09
                   << " sec. \t GFLOPS:            " << gflops / (best_time.count() * 1e-09) << std::endl;
+        
+        out_blis << size << ',' << gflops / (best_time.count() * 1e-09) << '\n';
 
         // for (int test = 0; test < number_of_tests; ++test) {
         //     mempcpy(c, c_old, size * size * sizeof(double));
@@ -107,6 +111,8 @@ int main() {
 
         std::cout << "JPI_JI_LOOP_P Size:         " << size << "x" << size << "\tTime: " << best_time.count() * 1e-09
                   << " sec. \t GFLOPS:            " << gflops / (best_time.count() * 1e-09) << std::endl;
+
+        out_jpi_ji_packed << size << ',' << gflops / (best_time.count() * 1e-09) << '\n';
         
         std::cout << std::endl;
 
