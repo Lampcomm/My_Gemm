@@ -7,7 +7,7 @@
 #include "../include/gemm.h"
 
 constexpr int begin_size = 100,
-              end_size = 10000,
+              end_size = 1000,
               step = 100,
               number_of_tests = 10;
 
@@ -15,9 +15,10 @@ int main() {
     double one = 1.0;
     double maxDiff = 0.0;
 
-    std::ofstream out_blis("blis.csv"), out_jpi_ji_packed("jpi_ji_packed.csv");
+    std::ofstream out_blis("blis.csv"), out_jpi_ji_packed("jpi_ji_packed.csv"), out_jpi_ji_packed_mt("jpi_ji_packed_mt.csv");
     out_blis << "N,GFLOPS\n";
     out_jpi_ji_packed << "N,GFLOPS\n";
+    out_jpi_ji_packed_mt << "N,GFLOPS,GFLOPS per thread\n";
 
     for (int size = begin_size; size <= end_size; size += step) {
         auto a = new double[size * size];
@@ -93,11 +94,33 @@ int main() {
         // std::cout << "JPI_JI_LOOP Size:       " << size << "x" << size << "\tTime: " << best_time.count() * 1e-09
         //           << " sec. \t GFLOPS:            " << gflops / (best_time.count() * 1e-09) << std::endl;
 
+        // for (int test = 0; test < number_of_tests; ++test) {
+        //     mempcpy(c, c_old, size * size * sizeof(double));
+            
+        //     auto begin = std::chrono::steady_clock::now();
+        //     JPI_JI_Loop_Packed(size, size, size, a, size, b, size, c, size);
+        //     auto end = std::chrono::steady_clock::now();
+
+        //     if (!test) {
+        //         best_time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
+        //     }
+        //     else {
+        //         best_time = std::min(best_time, 
+        //                              std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin));
+        //     }
+        //  }
+
+        // std::cout << "JPI_JI_LOOP_P Size:         " << size << "x" << size << "\tTime: " << best_time.count() * 1e-09
+        //           << " sec. \t GFLOPS:            " << gflops / (best_time.count() * 1e-09) << std::endl;
+
+
+        // out_jpi_ji_packed << size << ',' << gflops / (best_time.count() * 1e-09) << '\n';
+
         for (int test = 0; test < number_of_tests; ++test) {
             mempcpy(c, c_old, size * size * sizeof(double));
             
             auto begin = std::chrono::steady_clock::now();
-            JPI_JI_Loop_Packed(size, size, size, a, size, b, size, c, size);
+            JPI_JI_Loop_Packed_MT(size, size, size, a, size, b, size, c, size);
             auto end = std::chrono::steady_clock::now();
 
             if (!test) {
@@ -107,12 +130,13 @@ int main() {
                 best_time = std::min(best_time, 
                                      std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin));
             }
-         }
+        }
 
         std::cout << "JPI_JI_LOOP_P Size:         " << size << "x" << size << "\tTime: " << best_time.count() * 1e-09
-                  << " sec. \t GFLOPS:            " << gflops / (best_time.count() * 1e-09) << std::endl;
+                  << " sec. \t GFLOPS:            " << gflops / (best_time.count() * 1e-09) 
+                  << "\t GFLOPS per thread: " << (gflops / (best_time.count() * 1e-09)) / omp_get_max_threads() << std::endl;
 
-        out_jpi_ji_packed << size << ',' << gflops / (best_time.count() * 1e-09) << '\n';
+        out_jpi_ji_packed_mt << size << ',' << gflops / (best_time.count() * 1e-09) << ',' << (gflops / (best_time.count() * 1e-09)) / omp_get_max_threads() << '\n';
         
         std::cout << std::endl;
 

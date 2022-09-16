@@ -256,3 +256,165 @@ void JPI_JI_Loop_Packed(int m, int n, int k, double* a, int ldA, double* b, int 
     delete[] atilde;
     delete[] btilde;
 }
+
+void MT_packA(int m, int k, double *A, int ldA, double* atilde) {
+    #pragma omp parallel for
+    for (int i = 0; i < m; i += MR) {
+        pack_panelA(std::min(MR, m - i), k, &alpha(i, 0), ldA, &atilde[i * k]);
+    }
+}
+
+void MT_packB(int k, int n, double *B, int ldB, double* btilde) {
+    #pragma omp parallel for
+    for (int j = 0; j < n; j += NR) {
+        pack_panelB(k, std::min(NR, n - j), &beta(0, j), ldB, &btilde[j * k]);
+    }
+}
+
+//*****************************************************************************************************************
+// MT loop 2
+
+void JPI_JI_Loop_Packed_MT(int m, int n, int k, double* a, int ldA, double* b, int ldB, double* c, int ldC) {
+    auto *atilde = new double[MC * KC];
+    auto *btilde = new double[NC * KC];
+
+    for (int J = 0; J < n; J += NC) {
+        for (int P = 0; P < k; P += KC) {
+            MT_packB(std::min(KC, k - P), std::min(NC, n - J), b + J * ldB + P, ldB, btilde);
+
+            for (int I = 0; I < m; I += MC) {
+                MT_packA(std::min(MC, m - I), std::min(KC, k - P), a + P * ldA + I, ldA, atilde);
+
+                #pragma omp parallel for
+                for (int j = 0; j < std::min(NC, n - J); j += NR) {
+                    for (int i = 0; i < std::min(MC, m - I); i += MR) {
+                        double *A = atilde + i * std::min(KC, k - P);
+                        double *B = btilde + j * std::min(KC, k - P);
+                        double *C = c + J * ldC + I + j * ldC + i;
+
+                        kernel_packed(std::min(KC, k - P), A, B, C, ldC);
+                    }
+                }
+            }
+        }
+    }
+
+    delete[] atilde;
+    delete[] btilde;
+}
+//*****************************************************************************************************************
+
+// //*****************************************************************************************************************
+// // MT loop3
+
+// void Loop2 (int m, int n, int k, double* atilde, double* btilde, double* c, int ldC) {
+//     for (int j = 0; j < n; j += NR) {
+//         for (int i = 0; i < m; i += MR) {
+//             double *A = atilde + i * k;
+//             double *B = btilde + j * k;
+//             double *C = c + j * ldC + i;
+
+//             kernel_packed(k, A, B, C, ldC);
+//         }
+//     }
+// }
+
+// void JPI_JI_Loop_Packed_MT(int m, int n, int k, double* a, int ldA, double* b, int ldB, double* c, int ldC) {
+//     auto *atilde = new double[MC * KC * omp_get_max_threads()];
+//     auto *btilde = new double[NC * KC];
+
+//     for (int J = 0; J < n; J += NC) {
+//         for (int P = 0; P < k; P += KC) {
+//             MT_packB(std::min(KC, k - P), std::min(NC, n - J), b + J * ldB + P, ldB, btilde);
+
+//             int MC_per_thread = ((MC / omp_get_max_threads()) / MR) * MR;
+
+//             int whole_part = (m / (MC_per_thread * omp_get_max_threads())) * MC_per_thread * omp_get_max_threads();
+
+//             int remainder_per_thread = (((m - whole_part) / omp_get_max_threads()) / MR) * MR;
+
+//             if (!remainder_per_thread) {
+//                 remainder_per_thread = MR;
+//             }
+
+//             #pragma omp parallel for
+//             for (int I = 0; I < whole_part; I += MC_per_thread) {
+//                 packA(std::min(MC_per_thread, m - I), std::min(KC, k - P), a + P * ldA + I, ldA, atilde + MC * KC * omp_get_thread_num());
+//                 Loop2(std::min(MC_per_thread, m - I), std::min(NC, n - J), std::min(KC, k - P), atilde + MC * KC * omp_get_thread_num(), btilde, c + J * ldC + I, ldC);
+//             }
+
+//             #pragma omp parallel for
+//             for (int I = whole_part; I < m; I += remainder_per_thread) {
+//                 packA(std::min(remainder_per_thread, m - I), std::min(KC, k - P), a + P * ldA + I, ldA, atilde + MC * KC * omp_get_thread_num());
+//                 Loop2(std::min(remainder_per_thread, m - I), std::min(NC, n - J), std::min(KC, k - P), atilde + MC * KC * omp_get_thread_num(), btilde, c + J * ldC + I, ldC);
+//             }
+//         }
+//     }
+
+//     delete[] atilde;
+//     delete[] btilde;
+// }
+// //*****************************************************************************************************************
+
+//*****************************************************************************************************************
+// MT loop 5
+
+// void JPI_JI_Loop_Packed_MT(int m, int n, int k, double* a, int ldA, double* b, int ldB, double* c, int ldC) {
+//     auto *atilde = new double[MC * KC * omp_get_max_threads()];
+//     auto *btilde = new double[NC * KC * omp_get_max_threads()];
+
+//     int NC_per_thread = ((NC / omp_get_max_threads()) / NR) * NR;
+//     int whole_part = (n / (NC_per_thread * omp_get_max_threads())) * NC_per_thread * omp_get_max_threads();
+
+//     int remainder_per_thread = (((n - whole_part) / omp_get_max_threads()) / NR) * NR;
+
+//     if (!remainder_per_thread) {
+//         remainder_per_thread = NR;
+//     }
+
+//     #pragma omp parallel for
+//     for (int J = 0; J < whole_part; J += NC_per_thread) {
+//         for (int P = 0; P < k; P += KC) {
+//             packB(std::min(KC, k - P), std::min(NC_per_thread, n - J), b + J * ldB + P, ldB, btilde + NC * KC * omp_get_thread_num());
+
+//             for (int I = 0; I < m; I += MC) {
+//                 packA(std::min(MC, m - I), std::min(KC, k - P), a + P * ldA + I, ldA, atilde + MC * KC * omp_get_thread_num());
+
+//                 for (int j = 0; j < std::min(NC_per_thread, n - J); j += NR) {
+//                     for (int i = 0; i < std::min(MC, m - I); i += MR) {
+//                         double *A = atilde + MC * KC * omp_get_thread_num() + i * std::min(KC, k - P);
+//                         double *B = btilde + NC * KC * omp_get_thread_num() + j * std::min(KC, k - P);
+//                         double *C = c + J * ldC + I + j * ldC + i;
+
+//                         kernel_packed(std::min(KC, k - P), A, B, C, ldC);
+//                     }
+//                 }
+//             }
+//         }
+//     }
+
+//     #pragma omp parallel for
+//     for (int J = whole_part; J < n; J += remainder_per_thread) {
+//         for (int P = 0; P < k; P += KC) {
+//             packB(std::min(KC, k - P), std::min(remainder_per_thread, n - J), b + J * ldB + P, ldB, btilde + NC * KC * omp_get_thread_num());
+
+//             for (int I = 0; I < m; I += MC) {
+//                 packA(std::min(MC, m - I), std::min(KC, k - P), a + P * ldA + I, ldA, atilde + MC * KC * omp_get_thread_num());
+
+//                 for (int j = 0; j < std::min(remainder_per_thread, n - J); j += NR) {
+//                     for (int i = 0; i < std::min(MC, m - I); i += MR) {
+//                         double *A = atilde + MC * KC * omp_get_thread_num() + i * std::min(KC, k - P);
+//                         double *B = btilde + NC * KC * omp_get_thread_num() + j * std::min(KC, k - P);
+//                         double *C = c + J * ldC + I + j * ldC + i;
+
+//                         kernel_packed(std::min(KC, k - P), A, B, C, ldC);
+//                     }
+//                 }
+//             }
+//         }
+//     }
+
+//     delete[] atilde;
+//     delete[] btilde;
+// }
+//*****************************************************************************************************************
