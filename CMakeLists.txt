@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.0.0)
 project(My_Gemm VERSION 0.1.0)
 
-# set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -mavx2 -march=native")
 set(BLA_VENDOR FLAME)
 find_package(BLAS)
@@ -15,7 +14,7 @@ endif()
 
 find_package(OpenMP)
 
-include_directories(include)
+# include_directories(include)
 set(SOURCE src/main.cpp
            src/stuff_for_matrix.cpp
            src/gemm.cpp)
